@@ -32,4 +32,6 @@ Headless Chromium (Playwright) test: drawings stay separate per page, persist ac
 ## Ideas not built yet
 - Autosave to a file in a shared folder (File System Access API) to sync Chrome and Edge.
 - Page thumbnails / page list.
-- Deploy to GitHub Pages (needs an empty public repo; site files are the contents of `dist/`).
+
+## Deploy
+Repo: https://github.com/shubhankarreddy/whiteboard. Every push to `main` builds and deploys to GitHub Pages via `.github/workflows/deploy.yml`. Live at https://shubhankarreddy.github.io/whiteboard/.
