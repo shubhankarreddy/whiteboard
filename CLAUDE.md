@@ -13,7 +13,7 @@ Used by one person on one device, for teaching/recording and note-taking.
 React 18, Vite, `@excalidraw/excalidraw` 0.18.x, `idb-keyval` (IndexedDB). Plain JavaScript (no TypeScript).
 
 ## Files
-- `src/App.jsx`: UI and logic: page tabs (new, rename, duplicate, delete, drag to reorder), debounced autosave, dark mode, backup/import.
+- `src/App.jsx`: UI and logic: page tabs (new, rename, duplicate, delete, drag to reorder), debounced autosave, dark mode, backup/import, Export PDF.
 - `src/storage.js`: IndexedDB helpers (`wb:meta` = page list, active page, theme; `wb:page:<id>` = `{ elements, appState, files }`).
 - `src/styles.css`: layout and theme.
 - `index.html`: sets `window.EXCALIDRAW_ASSET_PATH = "./"` so fonts load from `public/fonts` (copied from `node_modules/@excalidraw/excalidraw/dist/prod/fonts`), not a public CDN.
@@ -24,6 +24,7 @@ React 18, Vite, `@excalidraw/excalidraw` 0.18.x, `idb-keyval` (IndexedDB). Plain
 - Autosave: `onChange` -> 700 ms debounce -> IndexedDB; also flushed on page switch and when the tab is hidden/closed.
 - Only a small part of `appState` is saved (scroll, zoom, background colour, grid). Only image `files` still used by an element are saved.
 - Import adds the backup's pages as new pages (never overwrites existing ones).
+- Export PDF: one PDF page per non-empty whiteboard page, sized to its drawing, always light theme. Each page is a PNG (2x, max 4000 px long side) via Excalidraw `exportToCanvas`, assembled with `jspdf` (lazy-loaded on click).
 - Data lives in one browser profile only; different browsers/profiles do not share it. Backup/import is the way to move data.
 
 ## Verified

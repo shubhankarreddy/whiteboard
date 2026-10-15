@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Excalidraw } from "@excalidraw/excalidraw";
+import { Excalidraw, exportToCanvas } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import {
   loadMeta,
@@ -190,6 +190,56 @@ export default function App() {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
 
+  // ---------- PDF ----------
+  // One PDF page per whiteboard page (empty pages skipped), each sized to its drawing.
+  const exportPdf = async () => {
+    await flush();
+    setStatus("Making PDF…");
+    try {
+      const { jsPDF } = await import("jspdf"); // loaded only when needed
+      let pdf = null;
+      for (const p of metaRef.current.pages) {
+        const data = await loadPage(p.id);
+        const elements = (data.elements || []).filter((el) => !el.isDeleted);
+        if (!elements.length) continue;
+        let scale = 1;
+        const canvas = await exportToCanvas({
+          elements,
+          appState: {
+            exportBackground: true,
+            exportWithDarkMode: false,
+            viewBackgroundColor: data.appState?.viewBackgroundColor || "#ffffff",
+          },
+          files: data.files || {},
+          exportPadding: 24,
+          // Sharp but bounded: 2x, capped at 4000 px on the long side
+          getDimensions: (w, h) => {
+            scale = Math.min(2, 4000 / Math.max(w, h));
+            return { width: w * scale, height: h * scale, scale };
+          },
+        });
+        // 1 CSS px = 0.75 pt
+        const w = (canvas.width / scale) * 0.75;
+        const h = (canvas.height / scale) * 0.75;
+        const orientation = w > h ? "landscape" : "portrait";
+        if (!pdf) pdf = new jsPDF({ unit: "pt", format: [w, h], orientation });
+        else pdf.addPage([w, h], orientation);
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, w, h, undefined, "FAST");
+      }
+      if (!pdf) {
+        setStatus("");
+        window.alert("Nothing to export: all pages are empty.");
+        return;
+      }
+      pdf.save(`whiteboard-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setStatus("PDF ready");
+    } catch (err) {
+      console.error(err);
+      setStatus("");
+      window.alert("Could not make the PDF.");
+    }
+  };
+
   const importBackup = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -229,6 +279,7 @@ export default function App() {
         <div className="spacer" />
         <span className="status">{status}</span>
         <button onClick={toggleTheme}>{dark ? "Light mode" : "Dark mode"}</button>
+        <button onClick={exportPdf}>Export PDF</button>
         <button onClick={downloadBackup}>Download backup</button>
         <button onClick={() => fileInput.current?.click()}>Import backup</button>
         <input
