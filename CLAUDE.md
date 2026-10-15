@@ -13,7 +13,7 @@ Used by one person on one device, for teaching/recording and note-taking.
 React 18, Vite, `@excalidraw/excalidraw` 0.18.x, `idb-keyval` (IndexedDB). Plain JavaScript (no TypeScript).
 
 ## Files
-- `src/App.jsx`: UI and logic: page tabs (new, rename, duplicate, delete, drag to reorder), debounced autosave, dark mode, backup/import, Export PDF.
+- `src/App.jsx`: UI and logic: page tabs (new, rename, duplicate, delete, drag to reorder; save status at the right end of the tab row), debounced autosave, dark mode, backup/import, Export PDF. There is no top bar: Export PDF / backup / import / theme live in Excalidraw's ☰ `MainMenu`.
 - `src/storage.js`: IndexedDB helpers (`wb:meta` = page list, active page, theme; `wb:page:<id>` = `{ elements, appState, files }`).
 - `src/styles.css`: layout and theme.
 - `index.html`: sets `window.EXCALIDRAW_ASSET_PATH = "./"` so fonts load from `public/fonts` (copied from `node_modules/@excalidraw/excalidraw/dist/prod/fonts`), not a public CDN.
@@ -21,6 +21,8 @@ React 18, Vite, `@excalidraw/excalidraw` 0.18.x, `idb-keyval` (IndexedDB). Plain
 
 ## Design decisions
 - One `<Excalidraw>` instance, remounted with `key={pageId}` on page switch (clean undo history per page).
+- Excalidraw owns the theme (no `theme` prop): it starts from `meta.theme` via `initialData`, and `onChange` copies `appState.theme` back into meta. Making it controlled AND syncing back loops forever.
+- The `<MainMenu>` element is built once with `useMemo([])`: a new children element each render makes Excalidraw fire `onChange`, which restarts autosave in an endless loop.
 - Autosave: `onChange` -> 700 ms debounce -> IndexedDB; also flushed on page switch and when the tab is hidden/closed.
 - Only a small part of `appState` is saved (scroll, zoom, background colour, grid). Only image `files` still used by an element are saved.
 - Import adds the backup's pages as new pages (never overwrites existing ones).

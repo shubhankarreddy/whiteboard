@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Excalidraw, exportToCanvas } from "@excalidraw/excalidraw";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Excalidraw, MainMenu, exportToCanvas } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import {
   loadMeta,
@@ -14,6 +14,17 @@ import {
 } from "./storage.js";
 
 const SAVE_DELAY_MS = 700;
+
+// Small line icons for our items in Excalidraw's ☰ menu
+const icon = (d) => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+    strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+const pdfIcon = icon("M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4");
+const downloadIcon = icon("M12 4v11M7 10l5 5 5-5M5 20h14");
+const uploadIcon = icon("M12 20V9M7 14l5-5 5 5M5 4h14");
 
 export default function App() {
   const [meta, setMeta] = useState(null); // { pages:[{id,name}], activeId, theme }
@@ -68,6 +79,10 @@ export default function App() {
   const onChange = useCallback(
     (elements, appState, files) => {
       if (!scene) return;
+      // Excalidraw owns the theme (☰ menu toggle, Shift+Alt+D); we follow and save it
+      if (appState.theme !== metaRef.current.theme) {
+        updateMeta({ ...metaRef.current, theme: appState.theme });
+      }
       latest.current = { id: scene.id, elements, appState, files };
       setStatus("Saving…");
       clearTimeout(timer.current);
@@ -172,10 +187,6 @@ export default function App() {
     await updateMeta({ ...m, pages });
   };
 
-  // ---------- theme ----------
-  const toggleTheme = () =>
-    updateMeta({ ...metaRef.current, theme: metaRef.current.theme === "dark" ? "light" : "dark" });
-
   // ---------- backup / import ----------
   const downloadBackup = async () => {
     await flush();
@@ -268,28 +279,47 @@ export default function App() {
     }
   };
 
+  // Whiteboard actions live in Excalidraw's ☰ menu to keep the screen free.
+  // Built once: a new menu element each render makes Excalidraw fire onChange,
+  // which re-renders us, in an endless save loop. (The handlers only use refs
+  // and stable setters, so the first-render versions stay correct.)
+  const menu = useMemo(
+    () => (
+      <MainMenu>
+        <MainMenu.Item icon={pdfIcon} onSelect={exportPdf}>
+          Export PDF (all pages)
+        </MainMenu.Item>
+        <MainMenu.Item icon={downloadIcon} onSelect={downloadBackup}>
+          Download backup
+        </MainMenu.Item>
+        <MainMenu.Item icon={uploadIcon} onSelect={() => fileInput.current?.click()}>
+          Import backup
+        </MainMenu.Item>
+        <MainMenu.Separator />
+        <MainMenu.DefaultItems.SaveAsImage />
+        <MainMenu.DefaultItems.Help />
+        <MainMenu.DefaultItems.ClearCanvas />
+        <MainMenu.Separator />
+        <MainMenu.DefaultItems.ToggleTheme />
+        <MainMenu.DefaultItems.ChangeCanvasBackground />
+      </MainMenu>
+    ),
+    []
+  );
+
   if (!meta || !scene) return <div className="loading">Loading…</div>;
 
   const dark = meta.theme === "dark";
 
   return (
     <div className={`app ${dark ? "dark" : ""}`}>
-      <header className="topbar">
-        <div className="title">My Whiteboard</div>
-        <div className="spacer" />
-        <span className="status">{status}</span>
-        <button onClick={toggleTheme}>{dark ? "Light mode" : "Dark mode"}</button>
-        <button onClick={exportPdf}>Export PDF</button>
-        <button onClick={downloadBackup}>Download backup</button>
-        <button onClick={() => fileInput.current?.click()}>Import backup</button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/json,.json"
-          hidden
-          onChange={importBackup}
-        />
-      </header>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="application/json,.json"
+        hidden
+        onChange={importBackup}
+      />
 
       <nav className="tabs">
         {meta.pages.map((p) => (
@@ -341,6 +371,8 @@ export default function App() {
         <button className="new-tab" onClick={addPage}>
           + New page
         </button>
+        <div className="spacer" />
+        <span className="status">{status}</span>
       </nav>
 
       <main className="canvas">
@@ -349,13 +381,14 @@ export default function App() {
           key={scene.id}
           initialData={{
             elements: scene.data.elements || [],
-            appState: scene.data.appState || {},
+            appState: { ...scene.data.appState, theme: meta.theme },
             files: scene.data.files || {},
             scrollToContent: !scene.data.appState?.scrollX && (scene.data.elements || []).length > 0,
           }}
-          theme={dark ? "dark" : "light"}
           onChange={onChange}
-        />
+        >
+          {menu}
+        </Excalidraw>
       </main>
     </div>
   );
